@@ -414,11 +414,16 @@ async def update_product_handler(update: Update, context: ContextTypes.DEFAULT_T
 async def help_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
     help_text = (
         "📚 *Trendyol Takip Botu - Komutlar*\n\n"
+        "*Ürün Yönetimi:*\n"
         "`/ekle <URL>` \\- Belirtilen Trendyol ürününü takip listesine ekler\\.\n"
-        "`/liste` veya `/takiptekiler` \\- Bu sohbette takip edilen ürünleri listeler\\.\n"
-        "`/bilgi <ID veya URL>` \\- Belirtilen ürün hakkında detaylı bilgi ve fiyat geçmişi verir\\.\n"
-        "`/sil <ID veya URL>` \\- Takip edilen bir ürünü bu sohbet için listeden çıkarır\\.\n"
-        "`/guncelle <ID veya URL>` \\- Ürün fiyatını manuel olarak günceller ve veritabanına kaydeder\\.\n"
+        "`/liste` (`/takiptekiler`) \\- Bu sohbette takip edilen ürünleri listeler\\.\n"
+        "`/bilgi <ID/URL>` \\- Belirtilen ürün hakkında detaylı bilgi ve fiyat geçmişi verir\\.\n"
+        "`/sil <ID/URL>` \\- Takip edilen bir ürünü bu sohbet için listeden çıkarır\\.\n"
+        "`/guncelle <ID/URL>` \\- Ürün fiyatını manuel olarak günceller ve veritabanına kaydeder\\.\n\n"
+        "*Ayarlar:*\n"
+        "`/ayarla_interval <saniye>` (`/set_interval`) \\- Bu sohbet için fiyat kontrol aralığını ayarlar (örn: 3600 = 1 saat)\\. Min:300, Max:86400\\.\n"
+        "`/bildirimler <ID/URL> <on|off>` (`/notifications`) \\- Belirli bir ürün için fiyat değişim bildirimlerini açar veya kapatır\\.\n\n"
+        "*Yardım:*\n"
         "`/yardim` \\- Bu yardım mesajını gösterir\\."
     )
     await update.message.reply_text(help_text, parse_mode=ParseMode.MARKDOWN_V2)
@@ -447,4 +452,132 @@ def register_commands(application):
     application.add_handler(CommandHandler("yardim", help_handler))
     application.add_handler(CommandHandler("help", help_handler)) # Alias
 
+    application.add_handler(CommandHandler("ayarla_interval", set_interval_handler))
+    application.add_handler(CommandHandler("set_interval", set_interval_handler)) # Alias
+
+    application.add_handler(CommandHandler("bildirimler", toggle_notifications_handler))
+    application.add_handler(CommandHandler("notifications", toggle_notifications_handler)) # Alias
+
     logger.info("Telegram command handlers registered.")
+
+async def toggle_notifications_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """Toggles notifications for a specific product in the current chat."""
+    db, scraper = await get_db_scraper(context)
+    if not db or not scraper:
+        await update.message.reply_text("Botun veritabanı veya kazıyıcı modülü hazır değil.")
+        return
+
+    chat_id = str(update.effective_chat.id)
+    user_id = str(update.effective_user.id)
+
+    usage_text = (
+        "Kullanım: `/bildirimler <ürün ID/URL> <on|off>`\n"
+        "Örnek: `/bildirimler urun123 on` veya `/bildirimler https://link.com/urun off`"
+    )
+
+    if len(context.args) != 2:
+        await update.message.reply_text(usage_text)
+        return
+
+    product_identifier = context.args[0]
+    state_str = context.args[1].lower()
+
+    if state_str not in ["on", "off", "aç", "kapat"]: # Added Turkish aliases for on/off
+        await update.message.reply_text(f"❌ Geçersiz durum: `{state_str}`. Lütfen 'on' veya 'off' kullanın.\n{usage_text}")
+        return
+
+    enabled_boolean = state_str in ["on", "aç"]
+
+    product_id = scraper.extract_product_id(product_identifier)
+    if not product_id:
+        # If not a URL, assume the identifier is the product_id itself
+        if not scraper.is_valid_url(product_identifier):
+            product_id = product_identifier
+        else: # It was a URL but couldn't be parsed
+            await update.message.reply_text(f"❌ Geçersiz ürün ID'si veya URL'si: `{escape_markdown_v2(product_identifier)}`")
+            return
+
+    # Check if the product exists for this user in this chat (optional, as set_product_notification checks ownership)
+    # However, providing a clearer message if the product isn't tracked by this user is better.
+    tracked_products_for_user_in_chat = db.get_all_products(chat_id=chat_id, user_id=user_id)
+    found_product_for_user = None
+    for p in tracked_products_for_user_in_chat:
+        if p['product_id'] == product_id:
+            found_product_for_user = p
+            break
+
+    if not found_product_for_user:
+        await update.message.reply_text(f"❌ Belirtilen ürün (`{escape_markdown_v2(product_id)}`) bu sohbette sizin tarafınızdan takip edilmiyor veya bulunamadı.")
+        return
+
+    product_name = escape_markdown_v2(found_product_for_user.get('name', product_id))
+
+    if db.set_product_notification(product_id, chat_id, user_id, enabled_boolean):
+        status_text = "aktif" if enabled_boolean else "devre dışı"
+        await update.message.reply_text(
+            f"✅ *{product_name}* adlı ürün için bildirimler `{status_text}` bırakıldı."
+        , parse_mode=ParseMode.MARKDOWN_V2)
+    else:
+        # This might happen if the product wasn't found by set_product_notification (shouldn't if above check passes)
+        # or if the state was already set to the desired value (rowcount would be 0).
+        # The db method was updated to return True if state is already as requested.
+        # So, this 'else' implies a more fundamental error or product not owned by user.
+        current_product_full_info = db.get_product(product_id) # Get global info
+        if current_product_full_info and \
+           str(current_product_full_info.get('chat_id')) == chat_id and \
+           str(current_product_full_info.get('user_id')) == user_id and \
+           bool(current_product_full_info.get('notifications_enabled')) == enabled_boolean:
+            status_text = "zaten aktifti" if enabled_boolean else "zaten devre dışıydı"
+            await update.message.reply_text(
+                f"ℹ️ *{product_name}* adlı ürün için bildirimler {status_text}."
+            , parse_mode=ParseMode.MARKDOWN_V2)
+        else:
+            await update.message.reply_text(f"❌ *{product_name}* adlı ürün için bildirim ayarı değiştirilemedi. Ürünün sahibi olduğunuzdan emin olun veya bir hata oluştu.", parse_mode=ParseMode.MARKDOWN_V2)
+
+
+async def set_interval_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """Sets the product check interval for the current chat."""
+    db, _ = await get_db_scraper(context) # Scraper not needed for this one
+    if not db:
+        await update.message.reply_text("Botun veritabanı modülü hazır değil. Lütfen daha sonra tekrar deneyin.")
+        return
+
+    chat_id = str(update.effective_chat.id)
+
+    if not context.args:
+        current_settings = db.get_chat_setting(chat_id)
+        current_interval_msg = "Şu anda varsayılan interval (1 saat) kullanılıyor."
+        if current_settings and current_settings.get('check_interval_seconds'):
+            current_interval_msg = f"Bu sohbet için mevcut kontrol aralığı: {current_settings['check_interval_seconds'] // 60} dakika."
+
+        await update.message.reply_text(
+            f"Lütfen bir interval süresi belirtin (saniye cinsinden)\n"
+            f"Örnek: `/ayarla_interval 3600` (1 saat için)\n"
+            f"Minimum: 300 (5 dakika), Maksimum: 86400 (1 gün)\n"
+            f"{current_interval_msg}"
+        )
+        return
+
+    try:
+        interval_seconds = int(context.args[0])
+        min_interval = 300  # 5 minutes
+        max_interval = 86400  # 1 day
+
+        if not (min_interval <= interval_seconds <= max_interval):
+            await update.message.reply_text(
+                f"❌ Geçersiz interval süresi. Lütfen {min_interval} (5 dakika) ile {max_interval} (1 gün) arasında bir değer girin."
+            )
+            return
+
+        if db.set_chat_check_interval(chat_id, interval_seconds):
+            await update.message.reply_text(
+                f"✅ Bu sohbet için ürün kontrol aralığı {interval_seconds // 60} dakika olarak ayarlandı."
+            )
+        else:
+            await update.message.reply_text("❌ Interval ayarlanırken bir hata oluştu.")
+
+    except ValueError:
+        await update.message.reply_text("❌ Geçersiz sayı formatı. Lütfen saniye cinsinden bir tam sayı girin.")
+    except Exception as e:
+        logger.error(f"Interval ayarlama hatası (chat: {chat_id}): {e}")
+        await update.message.reply_text("❌ Interval ayarlanırken beklenmedik bir hata oluştu.")

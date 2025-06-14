@@ -49,7 +49,8 @@ class Database:
             added_at TIMESTAMP,
             last_checked TIMESTAMP,
             chat_id TEXT,
-            user_id TEXT
+            user_id TEXT,
+            notifications_enabled BOOLEAN DEFAULT 1
         )
         ''')
 
@@ -63,7 +64,66 @@ class Database:
         )
         ''')
         
+        self.cursor.execute('''
+        CREATE TABLE IF NOT EXISTS chat_settings (
+            chat_id TEXT PRIMARY KEY,
+            check_interval_seconds INTEGER,
+            last_check_timestamp TIMESTAMP
+        )
+        ''')
+
         self.conn.commit()
+
+    def set_chat_check_interval(self, chat_id: str, interval_seconds: int, default_last_check: str | None = None):
+        """Belirli bir sohbet için kontrol aralığını ayarlar veya günceller."""
+        try:
+            if default_last_check is None:
+                # If setting interval for the first time and no last_check, don't set it to now,
+                # let the check_prices_job handle the first check immediately if needed.
+                # Or, set to a very old timestamp to ensure it runs soon.
+                # For simplicity, we can set it to NULL or let the ON CONFLICT handle it.
+                # If we want to ensure last_check_timestamp is populated, we might need a different strategy.
+                # Let's assume last_check_timestamp can be NULL initially or managed by update_chat_last_check.
+                # The provided SQL in plan uses excluded.last_check_timestamp, so it must exist or be defaulted.
+                # The plan's SQL for this method seems to assume last_check_timestamp is always provided or defaulted.
+                # Let's use current time if not provided, as per plan.
+                default_last_check = datetime.now().isoformat()
+
+            self.cursor.execute('''
+                INSERT INTO chat_settings (chat_id, check_interval_seconds, last_check_timestamp)
+                VALUES (?, ?, ?)
+                ON CONFLICT(chat_id) DO UPDATE SET
+                    check_interval_seconds = excluded.check_interval_seconds
+            ''', (chat_id, interval_seconds, default_last_check))
+            self.conn.commit()
+            return self.cursor.rowcount > 0
+        except Exception as e:
+            logger.error(f"Chat ({chat_id}) için interval ayarlanırken hata: {e}")
+            return False
+
+    def get_chat_setting(self, chat_id: str) -> dict | None:
+        """Belirli bir sohbetin ayarlarını getirir."""
+        self.cursor.execute("SELECT * FROM chat_settings WHERE chat_id = ?", (chat_id,))
+        row = self.cursor.fetchone()
+        if row:
+            columns = [desc[0] for desc in self.cursor.description]
+            return dict(zip(columns, row))
+        return None
+
+    def update_chat_last_check(self, chat_id: str, timestamp: str, default_interval_if_new: int = 3600):
+        """Bir sohbetin son kontrol zamanını günceller, yoksa varsayılan interval ile yeni kayıt oluşturur."""
+        try:
+            self.cursor.execute('''
+                INSERT INTO chat_settings (chat_id, check_interval_seconds, last_check_timestamp)
+                VALUES (?, ?, ?)
+                ON CONFLICT(chat_id) DO UPDATE SET
+                    last_check_timestamp = excluded.last_check_timestamp
+            ''', (chat_id, default_interval_if_new, timestamp))
+            self.conn.commit()
+            return self.cursor.rowcount > 0
+        except Exception as e:
+            logger.error(f"Chat ({chat_id}) için son kontrol zamanı güncellenirken hata: {e}")
+            return False
 
     def add_product(self, product_data, chat_id, user_id):
         """Ürün ekler ve ilk fiyat kaydını oluşturur."""
@@ -73,8 +133,8 @@ class Database:
             # Ürünü ekleme
             self.cursor.execute('''
             INSERT INTO products 
-            (product_id, name, url, image_url, current_price, original_price, added_at, last_checked, chat_id, user_id)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            (product_id, name, url, image_url, current_price, original_price, added_at, last_checked, chat_id, user_id, notifications_enabled)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
             ''', (
                 product_data['product_id'],
                 product_data['name'],
@@ -85,7 +145,8 @@ class Database:
                 now,
                 now,
                 chat_id,
-                user_id
+                user_id,
+                1 # notifications_enabled defaults to True (1)
             ))
             
             # Fiyat geçmişi kaydı ekleme
@@ -290,4 +351,37 @@ class Database:
             return False
         except Exception as e:
             logger.error(f"Veritabanı testi sırasında hata oluştu: {e}")
-            return False 
+            return False
+
+    def set_product_notification(self, product_id: str, chat_id: str, user_id: str, enabled: bool) -> bool:
+        """Bir ürün için bildirim ayarını günceller."""
+        try:
+            self.cursor.execute('''
+                UPDATE products
+                SET notifications_enabled = ?
+                WHERE product_id = ? AND chat_id = ? AND user_id = ?
+            ''', (1 if enabled else 0, product_id, chat_id, user_id))
+            self.conn.commit()
+            if self.cursor.rowcount > 0:
+                logger.info(f"Product {product_id} in chat {chat_id} for user {user_id} notifications set to {enabled}. Rows affected: {self.cursor.rowcount}")
+                return True
+            else:
+                # This can happen if product_id doesn't exist OR if chat_id/user_id doesn't match
+                logger.warning(f"No product found for {product_id} in chat {chat_id} by user {user_id} to update notification status, or status is already {enabled}.")
+                # To differentiate, we can do a SELECT first, but for now, this is acceptable.
+                # Check if the product exists at all for this chat_id by this user_id
+                self.cursor.execute("SELECT id FROM products WHERE product_id = ? AND chat_id = ? AND user_id = ?", (product_id, chat_id, user_id))
+                if self.cursor.fetchone():
+                    # Product exists, so it means the status was already what we tried to set it to.
+                    # Or, if we want to be strict and say "updated", this should be False if value is same.
+                    # For simplicity, if it exists and matches criteria, and new value is same, we can consider it "successful" in a way.
+                    # However, rowcount will be 0 if value doesn't change.
+                    # Let's return True if the final state is as requested, even if no change was made.
+                    self.cursor.execute("SELECT notifications_enabled FROM products WHERE product_id = ? AND chat_id = ? AND user_id = ?", (product_id, chat_id, user_id))
+                    current_db_state = self.cursor.fetchone()
+                    if current_db_state and bool(current_db_state[0]) == enabled:
+                        return True # State is already as requested
+                return False # No row updated and state is not as requested or product not found by this user in this chat
+        except Exception as e:
+            logger.error(f"Product {product_id} için bildirim ayarı güncellenirken hata: {e}")
+            return False
