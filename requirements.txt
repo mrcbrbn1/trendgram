@@ -1,6 +1,6 @@
-discord.py==2.3.2
 python-dotenv==1.0.0
 requests==2.31.0
 beautifulsoup4==4.12.2
 aiohttp==3.9.1
-# SQLite Python'un içinde varsayılan olarak bulunur, ayrıca yüklemeye gerek yok 
+# SQLite Python'un içinde varsayılan olarak bulunur, ayrıca yüklemeye gerek yok
+python-telegram-bot==13.15

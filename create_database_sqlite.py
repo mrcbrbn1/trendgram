@@ -43,9 +43,8 @@ if __name__ == "__main__":
         original_price REAL,
         added_at TIMESTAMP,
         last_checked TIMESTAMP,
-        guild_id TEXT,
-        user_id TEXT,
-        channel_id TEXT
+        chat_id TEXT,
+        user_id TEXT
     )
     ''')
     

@@ -48,9 +48,8 @@ class Database:
             original_price REAL,
             added_at TIMESTAMP,
             last_checked TIMESTAMP,
-            guild_id TEXT,
-            user_id TEXT,
-            channel_id TEXT
+            chat_id TEXT,
+            user_id TEXT
         )
         ''')
 
@@ -66,7 +65,7 @@ class Database:
         
         self.conn.commit()
 
-    def add_product(self, product_data, guild_id, user_id, channel_id):
+    def add_product(self, product_data, chat_id, user_id):
         """Ürün ekler ve ilk fiyat kaydını oluşturur."""
         try:
             now = datetime.now().isoformat()
@@ -74,8 +73,8 @@ class Database:
             # Ürünü ekleme
             self.cursor.execute('''
             INSERT INTO products 
-            (product_id, name, url, image_url, current_price, original_price, added_at, last_checked, guild_id, user_id, channel_id) 
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            (product_id, name, url, image_url, current_price, original_price, added_at, last_checked, chat_id, user_id)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
             ''', (
                 product_data['product_id'],
                 product_data['name'],
@@ -85,9 +84,8 @@ class Database:
                 product_data['original_price'],
                 now,
                 now,
-                guild_id,
-                user_id,
-                channel_id
+                chat_id,
+                user_id
             ))
             
             # Fiyat geçmişi kaydı ekleme
@@ -122,14 +120,14 @@ class Database:
             return dict(zip(columns, result))
         return None
 
-    def get_all_products(self, guild_id=None, user_id=None):
+    def get_all_products(self, chat_id=None, user_id=None):
         """Tüm ürünleri veya belirli bir kullanıcı/sunucu için ürünleri getirir."""
         query = "SELECT * FROM products"
         params = []
         
-        if guild_id:
-            query += " WHERE guild_id = ?"
-            params.append(guild_id)
+        if chat_id:
+            query += " WHERE chat_id = ?"
+            params.append(chat_id)
             
             if user_id:
                 query += " AND user_id = ?"
@@ -199,14 +197,14 @@ class Database:
         
         return history
 
-    def delete_product(self, product_id, guild_id=None, user_id=None):
+    def delete_product(self, product_id, chat_id=None, user_id=None):
         """Ürünü ve fiyat geçmişini siler."""
         try:
-            if guild_id and user_id:
+            if chat_id and user_id:
                 self.cursor.execute('''
                 DELETE FROM products 
-                WHERE product_id = ? AND guild_id = ? AND user_id = ?
-                ''', (product_id, guild_id, user_id))
+                WHERE product_id = ? AND chat_id = ? AND user_id = ?
+                ''', (product_id, chat_id, user_id))
             else:
                 self.cursor.execute('''
                 DELETE FROM products 
@@ -271,7 +269,7 @@ class Database:
             }
             
             # Test verisini ekle
-            result = self.add_product(test_data, 'test_guild', 'test_user', 'test_channel')
+            result = self.add_product(test_data, 'test_chat', 'test_user')
             if result:
                 logger.info("Veritabanı test verisi başarıyla eklendi.")
                 
