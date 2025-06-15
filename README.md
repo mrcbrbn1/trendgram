@@ -1,20 +1,20 @@
-# Trendyol Takip Botu
+# Trendyol Takip Telegram Botu
 
-Discord üzerinden Trendyol ürünlerinin fiyatlarını takip etmenizi sağlayan bir bot.
+Telegram üzerinden Trendyol ürünlerinin fiyatlarını takip etmenizi sağlayan bir bot.
 
 ## Özellikler
 
 - Trendyol ürünlerini takip etme
-- Fiyat değişikliklerinde otomatik bildirim gönderme
-- Ürün fiyat geçmişini izleme
-- Proxy desteği ile istekleri yönetme
-- Discord üzerinden kolay kullanılabilir komutlar
+- Fiyat değişikliklerinde otomatik Telegram bildirimi gönderme
+- Ürün fiyat geçmişini izleme (son 10 kayıt)
+- Proxy desteği ile istekleri yönetme (isteğe bağlı)
+- Telegram üzerinden kolay kullanılabilir komutlar:
+    - Sohbet bazlı özel fiyat kontrol aralığı ayarlama
+    - Ürün bazlı bildirimleri açma/kapama
 
 ## Kurulum
 
 Bu botu çalıştırmak için bilgisayarınızda Python 3.8 veya üzeri bir sürümün kurulu olması gerekmektedir.
-
-**Önemli Not:** Bu projenin dosyaları, bir yapay zeka tarafından oluşturulmuş veya düzenlenmiş olabilir. Bu nedenle, ana proje klasörünüzün adı (`trendyol`) içinde, aşağıda listelenen bazı ek dosyalarla karşılaşabilirsiniz. Bu döküman, bu olası durumu da göz önünde bulundurarak hazırlanmıştır.
 
 **Ön Hazırlıklar:**
 
@@ -23,15 +23,19 @@ Bu botu çalıştırmak için bilgisayarınızda Python 3.8 veya üzeri bir sür
     *   Kurulumu doğrulamak için komut satırına (Terminal veya Komut İstemi) `python --version` veya `python3 --version` yazın.
 
 2.  **Proje Dosyalarını Edinme:**
-    *   Proje dosyalarını içeren `trendyol` klasörünü bilgisayarınıza indirin (örneğin, ZIP olarak) ve istediğiniz bir konuma çıkartın.
-    *   Komut satırı/terminal üzerinden `trendyol` klasörünün içine gidin. Örneğin: `cd /path/to/trendyol` veya `cd C:\path\to\trendyol`.
+    *   Bu depoyu klonlayın veya ZIP olarak indirin.
+        ```bash
+        git clone <repository_url>
+        cd <repository_directory_adı>
+        ```
+    *   Komut satırı/terminal üzerinden proje klasörünün içine gidin.
 
 **Kurulum Adımları:**
 
 1.  **(Önerilen) Sanal Ortam Oluşturma ve Aktifleştirme:**
     Proje bağımlılıklarını sistem genelindeki Python paketlerinden ayırmak için bir sanal ortam oluşturmanız önerilir.
     ```bash
-    # trendyol klasörünün içindeyken:
+    # Proje klasörünün içindeyken:
     python -m venv venv
     # veya macOS/Linux üzerinde python3 kullanıyorsanız:
     # python3 -m venv venv
@@ -39,7 +43,7 @@ Bu botu çalıştırmak için bilgisayarınızda Python 3.8 veya üzeri bir sür
     Sanal ortamı aktifleştirin:
     *   **Windows (Komut İstemi veya PowerShell):**
         ```cmd
-        venv\Scripts\activate
+        venv\Scriptsctivate
         ```
     *   **macOS / Linux (Terminal):**
         ```bash
@@ -48,41 +52,40 @@ Bu botu çalıştırmak için bilgisayarınızda Python 3.8 veya üzeri bir sür
     Bundan sonraki komutları bu aktif sanal ortamda çalıştıracaksınız.
 
 2.  **Gerekli Paketleri Yükleme:**
-    `trendyol` klasörünüzde `requirements.txt` dosyası bulunmalıdır. Aşağıdaki komut ile gerekli Python paketlerini yükleyin:
+    Proje klasörünüzde `requirements.txt` dosyası bulunmaktadır. Aşağıdaki komut ile gerekli Python paketlerini yükleyin:
     ```bash
     pip install -r requirements.txt
     ```
-    **Not**: Windows'ta Türkçe karakter içeren bir yolda kurulum yapıyorsanız ve sorun yaşıyorsanız, alternatif olarak şu komutu kullanabilirsiniz (eğer `requirements_fix.txt` dosyası projenizde mevcutsa):
-    ```bash
-    pip install -r requirements_fix.txt
-    ```
-    Eğer `trendyol` klasörünüzde `install_requirements.py` gibi bir dosya varsa, bu alternatif bir kurulum scripti olabilir. Genellikle yukarıdaki `pip install -r ...` komutları yeterli olacaktır. `req.txt` dosyası da benzer şekilde alternatif bir bağımlılık listesi olabilir.
 
-3.  **Veritabanını Oluşturma:**
-    `trendyol` klasörünüzde `init_db.py` adlı bir script bulunmalıdır. Bu scripti çalıştırarak veritabanını oluşturun:
+3.  **`.env` Yapılandırma Dosyasını Oluşturma ve Düzenleme:**
+    Proje ana dizininde `.env` adında bir dosya oluşturun ve aşağıdaki içeriği kendi bilgilerinize göre düzenleyerek içine yapıştırın:
+
+    ```dotenv
+    # Telegram Bot Token - BotFather'dan alınacak
+    TELEGRAM_TOKEN=buraya_telegram_bot_tokeninizi_ekleyin
+
+    # Bot Ayarları
+    CHECK_INTERVAL=300 # Ana fiyat kontrol görevinin ne sıklıkla çalışacağı (saniye). Örn: 300 (5 dakika)
+    DEFAULT_CHAT_INTERVAL=3600 # Sohbetler için varsayılan fiyat kontrol aralığı (saniye). Örn: 3600 (1 saat)
+
+    PROXY_ENABLED=False # Proxy kullanımını etkinleştirmek için True yapın
+    VERIFY_SSL=True # SSL sertifika doğrulaması. Proxy veya yerel ağ sorunları için False yapılabilir.
+
+    # Veritabanı Ayarları
+    DATABASE_PATH=data/trendyol_tracker.sqlite # Ana veritabanı dosyası
+    BACKUP_DATABASE_PATH=data/database.sqlite # init_db.py tarafından oluşturulan yedek veritabanı yolu (isteğe bağlı)
+    ```
+    *   `TELEGRAM_TOKEN`: Telegram'da BotFather ile oluşturduğunuz botunuza ait token'ı buraya girin.
+    *   `CHECK_INTERVAL`: Botun genel olarak ne sıklıkta fiyatları kontrol etmek için uyanacağını belirler.
+    *   `DEFAULT_CHAT_INTERVAL`: Bir sohbet için özel bir aralık ayarlanmamışsa kullanılacak varsayılan kontrol aralığı.
+
+4.  **Veritabanını Oluşturma:**
+    `init_db.py` scriptini çalıştırarak veritabanı tablolarını oluşturun:
     ```bash
     python init_db.py
     # veya macOS/Linux üzerinde python3 kullanıyorsanız:
     # python3 init_db.py
     ```
-    Eğer `trendyol` klasörünüzde `create_database_sqlite.py` gibi bir dosya varsa, bu `init_db.py`'ye alternatif bir veritabanı oluşturma scripti olabilir. Öncelikle `init_db.py`'yi deneyin.
-
-4.  **`.env` Yapılandırma Dosyasını Oluşturma ve Düzenleme:**
-    `trendyol` klasörünün ana dizininde (`/path/to/trendyol` veya `C:\path\to\trendyol`) `.env` adında bir dosya oluşturun ve aşağıdaki içeriği kendi bilgilerinize göre düzenleyerek içine yapıştırın:
-    ```dotenv
-    # Discord Bot Token - Discord Developer Portal'dan alınacak
-    DISCORD_TOKEN=buraya_discord_tokeninizi_ekleyin
-
-    # Bot Ayarları
-    PREFIX=!
-    CHECK_INTERVAL=3600 # Her saatte bir fiyat kontrolü (saniye cinsinden)
-    PROXY_ENABLED=True # Proxy kullanımını etkinleştir
-
-    # Veritabanı Ayarları
-    DATABASE_PATH=data/trendyol_tracker.sqlite # Ana veritabanı dosyası
-    BACKUP_DATABASE_PATH=data/database.sqlite # Yedek veritabanı dosyası (eğer kullanılıyorsa)
-    ```
-    *   `DISCORD_TOKEN`: Discord Developer Portal üzerinden oluşturduğunuz botunuza ait token'ı buraya girin.
 
 5.  **Botu Çalıştırma:**
     Sanal ortamınızın aktif olduğundan emin olun.
@@ -91,71 +94,66 @@ Bu botu çalıştırmak için bilgisayarınızda Python 3.8 veya üzeri bir sür
     # veya macOS/Linux üzerinde python3 kullanıyorsanız:
     # python3 main.py
     ```
-    Botunuz artık Discord sunucunuzda aktif olmalıdır.
+    Botunuz artık Telegram'da aktif olmalıdır.
 
 ## Komutlar
 
-- `!ekle <Trendyol Linki>` - Takip edilecek ürün ekler
-- `!takiptekiler` - Takip edilen ürünleri listeler
-- `!bilgi <Ürün ID veya URL>` - Belirtilen ürün hakkında detaylı bilgi verir
-- `!sil <Ürün ID>` - Takip edilen bir ürünü listeden çıkarır
-- `!güncelle <Ürün ID>` - Ürün bilgilerini manuel olarak günceller
-- `!yardım` - Yardım mesajını gösterir
+Aşağıda bot ile kullanabileceğiniz ana komutlar listelenmiştir:
+
+*   `/ekle <Trendyol Linki>`: Belirtilen Trendyol ürününü takip listesine ekler.
+    *   *Alias: `/add`*
+*   `/liste`: Bu sohbette takip edilen ürünleri listeler.
+    *   *Alias: `/takiptekiler`, `/list`*
+*   `/bilgi <Ürün ID veya URL>`: Belirtilen ürün hakkında detaylı bilgi ve fiyat geçmişini verir.
+    *   *Alias: `/info`*
+*   `/sil <Ürün ID veya URL>`: Takip edilen bir ürünü bu sohbet için listeden çıkarır. (Sadece ürünü ekleyen kişi silebilir).
+    *   *Alias: `/delete`, `/remove`*
+*   `/guncelle <Ürün ID veya URL>`: Ürün fiyatını manuel olarak günceller ve veritabanına kaydeder.
+    *   *Alias: `/update`*
+*   `/ayarla_interval <saniye>`: Bu sohbet için ürün fiyatlarının ne sıklıkta kontrol edileceğini ayarlar.
+    *   Minimum: 300 (5 dakika), Maksimum: 86400 (1 gün).
+    *   Örnek: `/ayarla_interval 3600` (1 saatte bir kontrol)
+    *   *Alias: `/set_interval`*
+*   `/bildirimler <Ürün ID/URL> <on|off|aç|kapat>`: Belirli bir ürün için fiyat değişikliği bildirimlerini açar veya kapatır.
+    *   Örnek: `/bildirimler urun123 on`
+    *   *Alias: `/notifications`*
+*   `/yardim`: Tüm komutları ve açıklamalarını gösterir.
+    *   *Alias: `/help`*
 
 ## Proje Yapısı
 
-`trendyol` klasörünüzün içeriği genel olarak aşağıdaki gibi olacaktır. Bazı dosyalar AI tarafından eklenmiş alternatifler veya ek notlar olabilir:
-
-- `main.py` - Ana bot dosyası
+- `main.py` - Ana Telegram bot dosyası
 - `database.py` - Veritabanı işlemleri
 - `scraper.py` - Trendyol ürün bilgilerini çekme işlemleri
-- `cogs/product_commands.py` - Bot komutları
+- `handlers/telegram_commands.py` - Telegram komut işleyicileri
 - `.env` - Konfigürasyon dosyası (sizin oluşturmanız gerekir)
-- `proxies.txt` - Proxy listesi (isteğe bağlı, proxy kullanılacaksa oluşturulur)
+- `proxies.txt` - Proxy listesi (isteğe bağlı, `PROXY_ENABLED=True` ise kullanılır)
 - `requirements.txt` - Gerekli Python paketleri
 - `init_db.py` - Veritabanını başlatan script
 - `data/` - Veritabanı dosyalarının saklandığı klasör
   - `trendyol_tracker.sqlite` - Ana veritabanı dosyası
-  - `database.sqlite` - Yedek veritabanı dosyası (veya `BACKUP_DATABASE_PATH` ile belirtilen dosya)
 
-**AI Tarafından Oluşturulmuş Olabilecek Ek Dosyalar (`trendyol` klasörü içinde):**
-
-- `create_database_sqlite.py`: Muhtemelen `init_db.py`'ye alternatif bir veritabanı oluşturma scripti.
-- `database_alt.py`: Muhtemelen `database.py`'ye alternatif bir veritabanı modülü.
-- `install_requirements.py`: `pip install -r requirements.txt` komutuna alternatif bir Python scripti ile paket yükleme denemesi olabilir.
-- `manuel_kurulum.txt`: Manuel kurulum adımlarını veya ek notları içeren bir metin dosyası olabilir. İncelemenizde fayda var.
-- `req.txt`: `requirements.txt`'ye alternatif veya farklı bir bağımlılık listesi olabilir.
-- `scraper_alt.py`: Muhtemelen `scraper.py`'ye alternatif bir ürün bilgisi çekme modülü.
-- `requirements_fix.txt`: Windows'ta Türkçe karakter sorunları için hazırlanmış alternatif bir bağımlılık listesi.
+**Not (Proje Geçmişi Hakkında):**
+Bu proje daha önce Discord botu olarak geliştirilmiş ve sonrasında Telegram'a uyarlanmıştır. Kod tabanında yapay zeka destekli araçlar kullanılarak düzenlemeler yapılmış olabilir. Bu süreçte artık kullanılmayan bazı eski dosyalar (örneğin `TrendyolTakipBotu/` klasörü, `database_alt.py`, `scraper_alt.py` gibi) temizlenmiştir. `manuel_kurulum.txt`, `req.txt`, `requirements_fix.txt` gibi dosyalarla karşılaşırsanız, bunlar genellikle projenin önceki versiyonlarından kalma veya alternatif kurulum denemelerine ait dosyalardır; güncel kurulum için yukarıdaki adımları takip etmeniz yeterlidir.
 
 ## Sorun Giderme
 
-- **Python veya pip komutu bulunamadı hatası**: Python kurulumu sırasında "Add Python to PATH" seçeneğini işaretlediğinizden emin olun. Değilse, Python'ı PATH'e manuel olarak eklemeniz veya tam yolunu (örn: `C:\Python39\python.exe`) kullanarak komutları çalıştırmanız gerekebilir.
-- **Windows'ta pip kurulum sorunu**: Türkçe karakter içeren dizinlerde pip kurulumu sorun çıkarabilir. Bu durumda, eğer mevcutsa `requirements_fix.txt` kullanın veya projeyi `C:\projects\bot` gibi basit bir yola taşıyın.
+- **Python veya pip komutu bulunamadı hatası**: Python kurulumu sırasında "Add Python to PATH" seçeneğini işaretlediğinizden emin olun.
 - **Sanal ortam hataları**: Sanal ortamı doğru oluşturup aktifleştirdiğinizden emin olun. Komut satırınızın başında `(venv)` gibi bir ifade görmelisiniz.
-- **Veritabanı bağlantı hatası**: Eğer veritabanıyla ilgili sorun yaşıyorsanız, `data` klasörünün var olduğundan ve yazma izinlerine sahip olduğunuzdan emin olun. `init_db.py` (veya alternatif olarak `create_database_sqlite.py`) scriptini çalıştırarak yeni bir veritabanı oluşturmayı deneyebilirsiniz.
+- **Veritabanı bağlantı hatası**: `data` klasörünün var olduğundan ve yazma izinlerine sahip olduğunuzdan emin olun. `init_db.py` scriptini çalıştırarak veritabanını oluşturduğunuzu teyit edin.
 - **Proxy bağlantı sorunları**:
-  - `.env` dosyasında `PROXY_ENABLED=False` ayarını kullanarak proxy kullanımını tamamen devre dışı bırakabilirsiniz.
-  - Alternatif olarak kendi çalışan proxy'lerinizi `proxies.txt` dosyasına ekleyebilirsiniz.
-  - Proxy sorunları genellikle "Max retries exceeded" veya "Connection timed out" gibi hatalarla görünür.
+  - `.env` dosyasında `PROXY_ENABLED=False` ayarını kullanarak proxy kullanımını devre dışı bırakabilirsiniz.
+  - `proxies.txt` dosyasına çalışan proxy'ler eklediğinizden emin olun.
+  - SSL hataları alıyorsanız `.env` dosyasında `VERIFY_SSL=False` olarak ayarlamayı deneyebilirsiniz (özellikle kendi kendine imzalanmış sertifikalı proxy'ler için).
 
 ## Proxy Kullanımı
 
-Bot, (eğer etkinleştirilmişse) `proxies.txt` dosyasındaki proxy listesini kullanır. Kendi proxylerinizi kullanmak isterseniz:
+Bot, (eğer `.env` dosyasında `PROXY_ENABLED=True` olarak ayarlanmışsa) `proxies.txt` dosyasındaki proxy listesini kullanır.
 
-1. `trendyol` klasörünün ana dizininde `proxies.txt` adında bir dosya oluşturun (eğer yoksa).
-2. Her satıra bir proxy `IP:PORT` formatında ekleyin (örn: `123.456.789.012:8080`).
-3. Yorum satırlarını `#` ile başlatabilirsiniz.
-4. `.env` dosyasında `PROXY_ENABLED=True` olduğundan emin olun.
-
-Eğer aşağıdaki gibi bir hata mesajı görürseniz:
-```
-Max retries exceeded with url: ... (Caused by ProxyError('Unable to connect to proxy', ConnectTimeoutError(...)))
-```
-Bu, proxy'nin yanıt vermediği anlamına gelir. Bu durumda:
-1. `.env` dosyasında `PROXY_ENABLED=False` ayarlayarak proxy'leri devre dışı bırakabilirsin, veya
-2. `proxies.txt` dosyasına daha güvenilir ve çalışan proxy'ler ekleyebilirsin.
+1.  Proje ana dizininde `proxies.txt` adında bir dosya oluşturun (eğer yoksa).
+2.  Her satıra bir proxy `IP:PORT` formatında ekleyin.
+3.  Yorum satırlarını `#` ile başlatabilirsiniz.
 
 ## Lisans
 
-Bu proje MIT lisansı altında lisanslanmıştır. Daha fazla bilgi için proje içerisindeki `LICENSE` dosyasına (eğer varsa) bakın.
+Bu proje MIT lisansı altında lisanslanmıştır. Daha fazla bilgi için proje içerisindeki `LICENSE` dosyasına bakın.
