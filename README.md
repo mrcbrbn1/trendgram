@@ -58,7 +58,8 @@ Bu botu çalıştırmak için bilgisayarınızda Python 3.8 veya üzeri bir sür
     ```
 
 3.  **`.env` Yapılandırma Dosyasını Oluşturma ve Düzenleme:**
-    Proje ana dizininde `.env` adında bir dosya oluşturun ve aşağıdaki içeriği kendi bilgilerinize göre düzenleyerek içine yapıştırın:
+    Proje ana dizininde bulunan `.env.example` dosyasını kopyalayarak `.env` adında yeni bir dosya oluşturabilirsiniz. Ardından bu `.env` dosyasını kendi bilgilerinizle düzenleyin.
+    Alternatif olarak, proje ana dizininde `.env` adında bir dosya oluşturun ve aşağıdaki içeriği kendi bilgilerinize göre düzenleyerek içine yapıştırın:
 
     ```dotenv
     # Telegram Bot Token - BotFather'dan alınacak
